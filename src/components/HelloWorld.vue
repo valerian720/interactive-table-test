@@ -32,6 +32,12 @@
                 aria-describedby="helpId"
                 placeholder=""
                 v-model="cell.value"
+                @input="cell.changeCell()"
+                @focus="cell.onFocus()"
+                @blur="
+                  cell.onBlur();
+                  recalculateTable();
+                "
               />
             </td>
           </tr>
@@ -46,12 +52,44 @@ import { Options, Vue } from "vue-class-component";
 import AlphanumericEncoder from "alphanumeric-encoder";
 
 class Cell {
-  value: string;
-  calcuatedValue?: string;
-
-  constructor(value = "") {
-    this.value = value;
+  value: string; // that is rendered on screen
+  //
+  inputedValue: string; // value that user have inputed
+  processedValue: string; // value that was calculated
+  //
+  constructor(value = "=A1") {
+    this.inputedValue = value;
     //
+    this.processedValue = "0";
+    this.value = this.processedValue;
+    //
+  }
+  changeCell() {
+    this.inputedValue = this.value;
+  }
+  onFocus() {
+    this.value = this.inputedValue;
+  }
+  onBlur() {
+    if (this.inputedValue.charAt(0) === "=") {
+      this.value = this.processedValue;
+    } else {
+      this.value = this.inputedValue;
+    }
+  }
+  getValue(): string {
+    let ret = this.inputedValue;
+    if (this.inputedValue.charAt(0) === "=") {
+      ret = this.processedValue;
+    }
+    return ret;
+  }
+  getInputedValue(): string {
+    return this.inputedValue;
+  }
+  processValue(newValue: string) {
+    this.processedValue = newValue;
+    this.value = newValue;
   }
 }
 
@@ -81,6 +119,41 @@ export default class HelloWorld extends Vue {
       let header = this.converter.encode(k);
       if (header) this.headers.push(header);
     }
+  }
+  recalculateTable() {
+    console.log("recalculating...");
+    for (const row of this.table) {
+      for (const curCell of row) {
+        let curVal = curCell.getInputedValue();
+        // check if needed to calc
+        if (curVal.charAt(0) === "=") {
+          curVal = curVal.substring(1);
+          // process "+"
+          let curValArr = curVal.split("+").map((e) => e.trim());
+          console.log(curValArr);
+          let res = 0;
+          for (const cellReference of curValArr) {
+            let coordinates = this.getCoordinates(cellReference);
+            console.log("coordinates", coordinates);
+
+            if (coordinates) {
+              res += Number(
+                this.table[coordinates[0]][coordinates[1]].getValue()
+              );
+            }
+          }
+          console.log(res);
+
+          //
+          curCell.processValue(`${res}`);
+        }
+      }
+    }
+    return;
+  }
+  getCoordinates(pos: string) {
+    let arr = pos.split(/(\d+)/);
+    return [Number(this.converter.decode(arr[0])) - 1, Number(arr[1]) - 1];
   }
 }
 </script>
